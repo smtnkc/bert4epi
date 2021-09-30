@@ -1,2 +1,2 @@
-# bert-ep-classification
+# bert4epi
 BERT model for Enhancer-Promoter Classification
