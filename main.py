@@ -60,7 +60,7 @@ def save_metrics(save_path, train_loss_list, dev_loss_list, global_steps_list):
                   'global_steps_list': global_steps_list}
     
     torch.save(state_dict, save_path)
-    print(f'Model saved to ==> {save_path}')
+    print(f'Metrics saved to ==> {save_path}')
 
 def load_metrics(load_path):
 
@@ -68,7 +68,7 @@ def load_metrics(load_path):
         return
     
     state_dict = torch.load(load_path, map_location=device)
-    print(f'Model loaded from <== {load_path}')
+    print(f'Metrics loaded from <== {load_path}')
     
     return state_dict['train_loss_list'], state_dict['dev_loss_list'], state_dict['global_steps_list']
 
@@ -201,6 +201,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='bert4epi')
     parser.add_argument('--cell_line', default='GM12878', type=str) # GM12878, HUVEC, HeLa-S3, IMR90, K562, NHEK, combined
     parser.add_argument('--seed', default=42, type=int)
+    parser.add_argument('--balanced', default=True, type=bool)
     args = parser.parse_args()
     random.seed(args.seed)
 
@@ -210,11 +211,12 @@ if __name__ == "__main__":
 
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-    df_frag_pairs_balanced = pd.read_csv('data/{}/frag_pairs_balanced.csv'.format(args.cell_line))
-    df_frag_pairs_balanced = df_frag_pairs_balanced[['enhancer_frag_name', 'enhancer_frag_seq', 'promoter_frag_name', 'promoter_frag_seq']]
-    df_frag_pairs_balanced.columns = ['enhancer_name', 'enhancer_seq', 'promoter_name', 'promoter_seq']
-    df_enh_frags = df_frag_pairs_balanced.drop_duplicates(subset=['enhancer_name'])[['enhancer_name', 'enhancer_seq']].reset_index(drop=True)
-    df_pro_frags = df_frag_pairs_balanced.drop_duplicates(subset=['promoter_name'])[['promoter_name', 'promoter_seq']].reset_index(drop=True)
+    frag_path = 'data/{}/frag_pairs{}.csv'.format(args.cell_line, '_balanced' if args.balanced else '')
+    df_frag_pairs = pd.read_csv(frag_path)
+    df_frag_pairs = df_frag_pairs[['enhancer_frag_name', 'enhancer_frag_seq', 'promoter_frag_name', 'promoter_frag_seq']]
+    df_frag_pairs.columns = ['enhancer_name', 'enhancer_seq', 'promoter_name', 'promoter_seq']
+    df_enh_frags = df_frag_pairs.drop_duplicates(subset=['enhancer_name'])[['enhancer_name', 'enhancer_seq']].reset_index(drop=True)
+    df_pro_frags = df_frag_pairs.drop_duplicates(subset=['promoter_name'])[['promoter_name', 'promoter_seq']].reset_index(drop=True)
 
     df_enh_frags.columns = ['label', 'text']
     for i in range(len(df_enh_frags)):

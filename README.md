@@ -2,5 +2,5 @@
 BERT model for Enhancer-Promoter Classification
 
 ```bash
-python main.py --cell_line='GM12878'
+python main.py --cell_line='GM12878' --balanced=True --seed=42
 ```
