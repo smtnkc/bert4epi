@@ -10,6 +10,7 @@ import seaborn as sns
 import logging
 from sklearn import metrics
 from sklearn.model_selection import train_test_split
+from torchtext import data
 from torchtext.data import Field, TabularDataset, BucketIterator, Iterator
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
@@ -28,6 +29,35 @@ class BERT(nn.Module):
         loss, seq_fea = self.encoder(text, labels=label)[:2]
 
         return loss, seq_fea
+
+class DataFrameDataset(data.Dataset):
+
+    def __init__(self, df, text_field, label_field, is_test=False, **kwargs):
+        fields = [('text', text_field), ('label', label_field)]
+        examples = []
+        for i, row in df.iterrows():
+            label = row.label if not is_test else None
+            text = row.text
+            examples.append(data.Example.fromlist([text, label], fields))
+
+        super().__init__(examples, fields, **kwargs)
+
+    @staticmethod
+    def sort_key(ex):
+        return len(ex.text)
+
+    @classmethod
+    def splits(cls, text_field, label_field, train_df, val_df=None, test_df=None, **kwargs):
+        train_data, val_data, test_data = (None, None, None)
+
+        if train_df is not None:
+            train_data = cls(train_df.copy(), text_field, label_field, **kwargs)
+        if val_df is not None:
+            val_data = cls(val_df.copy(), text_field, label_field, **kwargs)
+        if test_df is not None:
+            test_data = cls(test_df.copy(), text_field, label_field, True, **kwargs)
+
+        return tuple(d for d in (train_data, val_data, test_data) if d is not None)
 
 def save_checkpoint(save_path, model, dev_loss):
 
@@ -225,41 +255,24 @@ def getFragments(cell_line, balanced):
 
     return df_enh_frags, df_pro_frags
 
-def trainDevTestSplit(cell_line, cross_cell_line, balanced, seed):
+def trainDevTestSplit(cell_line, balanced, seed):
 
     df_enh_frags, df_pro_frags = getFragments(cell_line, balanced)
 
     df_enh_train, df_enh_test = train_test_split(df_enh_frags, test_size=0.1, random_state=seed)
     df_pro_train, df_pro_test = train_test_split(df_pro_frags, test_size=0.1, random_state=seed)
 
-    df_train_dev = df_enh_train.append(df_pro_train).sample(frac=1).reset_index(drop=True) # merge training enhancers and promoters and shuffle
-    df_test = df_enh_test.append(df_pro_test).sample(frac=1).reset_index(drop=True) # merge test enhancers and promoters and shuffle
+    df_train_dev = df_enh_train.append(df_pro_train).sample(frac=1, random_state=seed).reset_index(drop=True) # merge training enhancers and promoters and shuffle
+    df_test = df_enh_test.append(df_pro_test).sample(frac=1, random_state=seed).reset_index(drop=True) # merge test enhancers and promoters and shuffle
 
-    df_train, df_dev = train_test_split(df_train_dev, test_size=0.1, random_state=seed, shuffle=True) # split train and dev data
+    df_train, df_dev = train_test_split(df_train_dev, test_size=0.1, random_state=seed) # split train and dev data
 
     df_train = df_train.reset_index(drop=True)
     df_dev = df_dev.reset_index(drop=True)
 
-    if cross_cell_line != None:
-        dump_dir = 'data/{}/'.format(cell_line + '_' + cross_cell_line)
-    else:
-        dump_dir = 'data/{}/'.format(cell_line)
-    if not os.path.exists(dump_dir):
-        os.makedirs(dump_dir)
-
-    if cross_cell_line != None:
-        # overwrite df_test as 20% of the cross cell-line dataset (10% enh + 10% promoter)
-        print("TESTING ON CROSS CELL-LINE !!!\n")
-        cross_df_enh_frags, cross_df_pro_frags = getFragments(cross_cell_line, balanced)
-        _, cross_df_enh_test = train_test_split(cross_df_enh_frags, test_size=0.1, random_state=seed)
-        _, cross_df_pro_test = train_test_split(cross_df_pro_frags, test_size=0.1, random_state=seed)
-        df_test = cross_df_enh_test.append(cross_df_pro_test).sample(frac=1).reset_index(drop=True) # merge test enhancers and promoters and shuffle
-    else:
-        print("TESTING ON SAME CELL-LINE !!!\n")
-
-    df_train.to_csv("{}/train.csv".format(dump_dir), index=False)
-    df_dev.to_csv("{}/dev.csv".format(dump_dir), index=False)
-    df_test.to_csv("{}/test.csv".format(dump_dir), index=False)
+    df_train.to_csv("data/{}/train.csv".format(cell_line), index=False)
+    df_dev.to_csv("data/{}/dev.csv".format(cell_line), index=False)
+    df_test.to_csv("data/{}/test.csv".format(cell_line), index=False)
 
     print("{} TRAIN:\n{}\n".format(len(df_train), df_train.head()))
     print("{} DEV:\n{}\n".format(len(df_dev), df_dev.head()))
@@ -292,15 +305,20 @@ if __name__ == "__main__":
     fields = [('text', text_field), ('label', label_field)]
 
     # Generate Train/Dev/Test Data
-    df_train, df_dev, df_test = trainDevTestSplit(args.cell_line, args.cross_cell_line, args.balanced, args.seed) # balanced train/dev/test split
+    df_train, df_dev, df_test = trainDevTestSplit(args.cell_line, args.balanced, args.seed) # balanced train/dev/test split
 
     if args.cross_cell_line != None:
-        read_dir = 'data/{}'.format(args.cell_line + '_' + args.cross_cell_line)
+        # Overwrite df_test as 20% of cross cell-line dataset
+        print("TESTING ON CROSS CELL-LINE ({})".format(args.cross_cell_line))
+        _, _, df_test = trainDevTestSplit(args.cross_cell_line, args.balanced, args.seed) # balanced train/dev/test split
     else:
-        read_dir = 'data/{}'.format(args.cell_line)
+        print("TESTING ON SAME CELL-LINE ({})".format(args.cell_line))
 
-    train_set, dev_set, test_set = TabularDataset.splits(path='{}'.format(read_dir),
-        train='train.csv', validation='dev.csv', test='test.csv', format='CSV', fields=fields, skip_header=True)
+    # train_set, dev_set, test_set = TabularDataset.splits(path='data/{}'.format(args.cell_line),
+    #     train='train.csv', validation='dev.csv', test='test.csv', format='CSV', fields=fields, skip_header=True)
+
+    train_set, dev_set, test_set = DataFrameDataset.splits(
+        text_field=text_field, label_field=label_field, train_df=df_train, val_df=df_dev, test_df=df_test)
 
     train_iter = BucketIterator(train_set, batch_size=16, sort_key=lambda x: len(x.text), device=device, train=True, sort=True, sort_within_batch=True)
     dev_iter = BucketIterator(dev_set, batch_size=16, sort_key=lambda x: len(x.text), device=device, train=True, sort=True, sort_within_batch=True)
