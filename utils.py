@@ -63,7 +63,7 @@ def load_metrics(load_path, device):
 
     return state_dict['train_loss_list'], state_dict['dev_loss_list'], state_dict['global_steps_list']
 
-def train(model, device, optimizer, train_loader, dev_loader, eval_every, num_epochs, best_dev_loss, cell_line):
+def train(model, device, optimizer, train_loader, dev_loader, eval_every, num_epochs, best_dev_loss, cell_line, cv_step):
 
     # initialize running values
     running_loss = 0.0
@@ -134,13 +134,12 @@ def train(model, device, optimizer, train_loader, dev_loader, eval_every, num_ep
                 # checkpoint
                 if best_dev_loss > average_dev_loss:
                     best_dev_loss = average_dev_loss
-                    save_checkpoint('models/{}.pt'.format(cell_line), model, best_dev_loss)
-                    save_metrics('metrics/{}.pt'.format(cell_line), train_loss_list, dev_loss_list, global_steps_list)
+                    save_checkpoint('models/{}_{}.pt'.format(cell_line, cv_step), model, best_dev_loss)
+                    save_metrics('metrics/{}_{}.pt'.format(cell_line, cv_step), train_loss_list, dev_loss_list, global_steps_list)
 
-    save_metrics('metrics/{}.pt'.format(cell_line), train_loss_list, dev_loss_list, global_steps_list)
     print('Finished Training!')
 
-def evaluate(model, device, test_loader, cell_line, cross_cell_line):
+def evaluate(model, device, test_loader, cell_line, cross_cell_line, cv_step):
     y_pred = []
     y_true = []
 
@@ -181,11 +180,14 @@ def evaluate(model, device, test_loader, cell_line, cross_cell_line):
     if not os.path.isdir("results"):
         os.makedirs("results")
 
-    if cross_cell_line == None:
-        log_file = "results/{}.txt".format(cell_line)
-    else:
-        log_file = "results/{}.txt".format(cell_line + '_' + cross_cell_line)
-    open(log_file, 'w').close() # clear file content
-    logging.basicConfig(format='%(message)s', filename=log_file,level=logging.DEBUG)
-    logging.info(classification_report(y_true, y_pred, labels=[1,0], digits=4))
-    logging.info("AUC = {:.5f}".format(metrics.auc(fpr, tpr)))
+    logger = logging.getLogger('logger_{}'.format(cv_step))
+    logger.setLevel(logging.INFO)
+    log_file = "results/{}_{}_{}.txt".format(cell_line, cross_cell_line, cv_step)
+    handler = logging.FileHandler(log_file, 'w+')
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    logger.info(classification_report(y_true, y_pred, labels=[1,0], digits=4))
+    logger.info("AUC = {:.5f}".format(metrics.auc(fpr, tpr)))
