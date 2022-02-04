@@ -1,6 +1,7 @@
 import argparse
 import random
 import torch
+import time
 from transformers import BertTokenizer
 from torchtext.data import Field, TabularDataset, Iterator
 from utils import BERT, evaluate, load_checkpoint
@@ -53,7 +54,10 @@ if __name__ == "__main__":
         best_model = BERT().to(device)  # a new model instance
         load_checkpoint('models/{}_{}.pt'.format(args.cell_line, cv_step), best_model, device)
 
+        t1 = time.time()
         evaluate(best_model, device, test_iter, args.cell_line, args.cross_cell_line, cv_step)
+        t2 = time.time()
+        print('{}TEST TIME = {:.5f}{}'.format('\n' * 3, t2 - t1, '\n' * 3))
 
         if cv_step == 0 and args.k_fold == 0:
             break # no cross-validation
