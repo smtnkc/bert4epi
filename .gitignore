@@ -133,3 +133,6 @@ dmypy.json
 *.fna
 *.seq
 *.pt
+data/*/train*.csv
+data/*/dev*.csv
+data/*/test*.csv

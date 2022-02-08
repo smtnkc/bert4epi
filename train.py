@@ -49,11 +49,8 @@ if __name__ == "__main__":
         bert_model = BERT().to(device)
         adam_opt = optim.Adam(bert_model.parameters(), lr=2e-5)
 
-        t1 = time.time()
         train(bert_model, device, adam_opt, train_iter, dev_iter, eval_every = len(train_iter) // 2,
-            num_epochs = 5, best_dev_loss = float("Inf"), cell_line = args.cell_line, cv_step = cv_step)
-        t2 = time.time()
-        print('{}TEST TIME = {:.5f}{}'.format('\n' * 3, t2 - t1, '\n' * 3))
+              num_epochs = 5, best_dev_loss = float("Inf"), cell_line = args.cell_line, cv_step = cv_step)
 
         # train_loss_list, dev_loss_list, global_steps_list = load_metrics('metrics/{}_{}.pt'.format(args.cell_line, i), device)
         # plt.plot(global_steps_list, train_loss_list, label='Train')

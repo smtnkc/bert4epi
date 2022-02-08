@@ -2,8 +2,8 @@ import torch
 import os
 import torch.nn as nn
 import logging
-from sklearn import metrics
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import time
+from sklearn.metrics import f1_score, classification_report, confusion_matrix
 from transformers import BertForSequenceClassification
 
 
@@ -80,6 +80,7 @@ def train(model, device, optimizer, train_loader, dev_loader, eval_every, num_ep
         os.makedirs('metrics')
 
     # training loop
+    t1 = time.time()
     model.train()
     for epoch in range(num_epochs):
         for (texts, labels), _ in train_loader:
@@ -137,12 +138,14 @@ def train(model, device, optimizer, train_loader, dev_loader, eval_every, num_ep
                     save_checkpoint('models/{}_{}.pt'.format(cell_line, cv_step), model, best_dev_loss)
                     save_metrics('metrics/{}_{}.pt'.format(cell_line, cv_step), train_loss_list, dev_loss_list, global_steps_list)
 
-    print('Finished Training!')
+    t2 = time.time()
+    print('Finished training in {:.5f} seconds.'.format(t2 - t1))
 
 def evaluate(model, device, test_loader, cell_line, cross_cell_line, cv_step):
     y_pred = []
     y_true = []
 
+    t1 = time.time()
     model.eval()
     with torch.no_grad():
         for (texts, labels), _ in test_loader:
@@ -157,37 +160,42 @@ def evaluate(model, device, test_loader, cell_line, cross_cell_line, cv_step):
                 y_pred.extend(torch.argmax(output, 1).tolist())
                 y_true.extend(labels.tolist())
 
-    print('Classification Report:')
-    print(classification_report(y_true, y_pred, labels=[1,0], digits=4))
+    cr = classification_report(y_true, y_pred, labels=[1,0], digits=4)
+    print(cr)
+    cm = confusion_matrix(y_true, y_pred, labels=[1,0])
+    print('TEST CONFUSION = {}'.format(cm.tolist()))
+    f1 = f1_score(y_true, y_pred)
+    print("TEST F1 = {:.5f}".format(f1))
+    t2 = time.time()
+    print('TEST TIME = {:.5f}{}'.format(t2 - t1, '\n' * 3))
 
-    # cm = confusion_matrix(y_true, y_pred, labels=[1,0])
+    ### PLOT CONFUSION MATRIX
+
     # ax = plt.subplot()
     # sns.heatmap(cm, annot=True, ax = ax, cmap='Blues', fmt="d")
-
     # ax.set_title('Confusion Matrix')
-
     # ax.set_xlabel('Predicted Labels')
     # ax.set_ylabel('True Labels')
-
     # ax.xaxis.set_ticklabels(['ENHANCER', 'PROMOTER'])
     # ax.yaxis.set_ticklabels(['ENHANCER', 'PROMOTER'])
 
-    fpr, tpr, thresholds = metrics.roc_curve(y_true, y_pred, pos_label=1)
-    print("AUC =", metrics.auc(fpr, tpr))
-
-    # LOGS
+    ### LOGS
 
     if not os.path.isdir("results"):
         os.makedirs("results")
 
+    if cross_cell_line == None:
+        cross_cell_line = cell_line
+
     logger = logging.getLogger('logger_{}'.format(cv_step))
     logger.setLevel(logging.INFO)
     log_file = "results/{}_{}_{}.txt".format(cell_line, cross_cell_line, cv_step)
-    handler = logging.FileHandler(log_file, 'w+')
+    handler = logging.FileHandler(log_file, 'w')
     handler.setLevel(logging.INFO)
     formatter = logging.Formatter("%(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
-    logger.info(classification_report(y_true, y_pred, labels=[1,0], digits=4))
-    logger.info("AUC = {:.5f}".format(metrics.auc(fpr, tpr)))
+    logger.info(cr)
+    logger.info('TEST CONFUSION = {}'.format(cm.tolist()))
+    logger.info('TEST F1 = {:.5f}'.format(f1))
+    logger.info('TEST TIME = {:.5f}{}'.format(t2 - t1))
