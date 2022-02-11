@@ -1,0 +1,12 @@
+              precision    recall  f1-score   support
+
+           1     0.6983    0.7147    0.7064       638
+           0     0.7079    0.6912    0.6994       638
+
+    accuracy                         0.7030      1276
+   macro avg     0.7031    0.7030    0.7029      1276
+weighted avg     0.7031    0.7030    0.7029      1276
+
+TEST CONFUSION = [[456, 182], [197, 441]]
+TEST F1 = 0.70643
+TEST TIME = 5.17792

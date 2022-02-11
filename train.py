@@ -1,11 +1,16 @@
 import argparse
 import random
 import torch
-import time
 import torch.optim as optim
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+import transformers
+transformers.utils.logging.set_verbosity_error()
 from transformers import BertTokenizer
-from torchtext.data import Field, TabularDataset, BucketIterator, Iterator
-from utils import BERT, train, load_metrics
+from torchtext.data import Field, TabularDataset, BucketIterator
+from utils import BERT, train
 
 
 if __name__ == "__main__":
@@ -19,6 +24,9 @@ if __name__ == "__main__":
     print("\n{}".format(torch.__version__))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print("{}\n".format(device))
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
@@ -35,6 +43,8 @@ if __name__ == "__main__":
 
         if cv_step == 0 and args.k_fold > 0:
             continue # xxx_0.csv files are not for cross-validation
+
+        print('\n----- Starting CV Fold {} -----\n'.format(cv_step))
 
         train_set, dev_set, _ = TabularDataset.splits(path='data/{}'.format(args.cell_line),
             train='train_{}.csv'.format(cv_step),

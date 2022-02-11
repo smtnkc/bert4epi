@@ -1,7 +1,12 @@
 import argparse
 import random
 import torch
-
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+import transformers
+transformers.utils.logging.set_verbosity_error()
 from transformers import BertTokenizer
 from torchtext.data import Field, TabularDataset, Iterator
 from utils import BERT, evaluate, load_checkpoint
@@ -19,6 +24,9 @@ if __name__ == "__main__":
     print("\n{}".format(torch.__version__))
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print("{}\n".format(device))
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 

@@ -141,6 +141,21 @@ def train(model, device, optimizer, train_loader, dev_loader, eval_every, num_ep
     t2 = time.time()
     print('Finished training in {:.5f} seconds.'.format(t2 - t1))
 
+    ### LOGS
+
+    if not os.path.isdir("results"):
+        os.makedirs("results")
+
+    logger = logging.getLogger('training_logger_{}'.format(cv_step))
+    logger.setLevel(logging.INFO)
+    log_file = "results/training_time.txt"
+    handler = logging.FileHandler(log_file, 'a')
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.info('{} TRAINING TIME (FOLD {}) = {:.5f}'.format(cell_line, cv_step, t2 - t1))
+
 def evaluate(model, device, test_loader, cell_line, cross_cell_line, cv_step):
     y_pred = []
     y_true = []
@@ -198,4 +213,4 @@ def evaluate(model, device, test_loader, cell_line, cross_cell_line, cv_step):
     logger.info(cr)
     logger.info('TEST CONFUSION = {}'.format(cm.tolist()))
     logger.info('TEST F1 = {:.5f}'.format(f1))
-    logger.info('TEST TIME = {:.5f}{}'.format(t2 - t1))
+    logger.info('TEST TIME = {:.5f}'.format(t2 - t1))
